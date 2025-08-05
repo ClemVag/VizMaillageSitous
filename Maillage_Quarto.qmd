@@ -1,0 +1,66 @@
+---
+title: "Maillage visuel des sitous"
+editor: visual
+lang: fr-FR
+format:
+  pdf:
+    pdf-engine: xelatex
+    number-sections: true
+    fig-align: left
+    fig-width: 7
+    fig-height: 5
+    fig-format: png
+    papersize: A4
+    mainfont: "Calibri"
+    include-in-header: 
+      text: |
+        \usepackage{fancyhdr}
+        \usepackage{graphicx}
+        \usepackage{lastpage}
+        \usepackage{xcolor}
+        \pagestyle{fancy}
+        \fancyhf{}
+
+geometry: "left=1cm,right=1cm,top=0cm,bottom=1cm"
+execute:
+  echo: false
+  cache: false
+  message: false
+  warning: false
+output: 
+  df_print: kable
+---
+
+
+
+```{r}
+#0. PACKAGES ----
+library(tidyverse)
+library(dplyr)
+library(DiagrammeR)
+library(readxl)
+library(writexl)
+library(rsvg)
+library(xlsx)
+library(openxlsx)
+library(stringr)
+library(kableExtra)
+```
+\vspace{-2.5cm}
+![](quarto_files/diagramme.png)
+![](quarto_files/legende.png)
+```{r}
+noeuds_Q <- read_excel("quarto_files/noeuds.xlsx")
+ noeuds_Q <- noeuds_Q %>%
+  arrange(Type_Sitou) %>% 
+  kable(format = "latex", 
+        booktabs = TRUE, 
+        longtable = TRUE) %>% 
+  kable_styling(latex_options = c("repeat_header","striped"), font_size = 8) %>% 
+   column_spec(1, width = "3.5cm") %>%
+   column_spec(2, width = "8cm") %>%
+   column_spec(3, width = "1.5cm") %>%
+   column_spec(4, width = "4cm")
+
+noeuds_Q
+```
