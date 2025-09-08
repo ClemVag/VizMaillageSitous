@@ -6,6 +6,8 @@ library(readxl)
 library(writexl)
 library(rsvg)
 library(xlsx)
+library(openxlsx)
+library(stringr)
 
 #1. IMPORT FICHIER DE DONNEES ----
 
@@ -157,17 +159,25 @@ render_graph(graphe_indus,
              title="Liaisons Sitous industriels DVO")
 
 
-## 2.2. Maillage pour un sitou ----
+# 3. EXPORT DU MAILLAGE EN MASSE ----
+
+
 # AVANT D'OUVRIR LE FICHIER
 # Supprimer tous les " et les . dans le fichier Excel par un rechercher-remplacer. 
 # R ne sait pas le faire !
 
+##3.1. Création des tables préparatoires ----
+noeuds <- read_excel("CV-Généalogie_des_sitous_test.xlsx", 
+                     sheet = "noeuds")
+types_sitou<-noeuds %>% 
+  select(identifiant,Type_Sitou) %>% 
+  rename("No_Type_Sitou" = identifiant)
+types_sitou$No_Type_Sitou <- as.character(types_sitou$No_Type_Sitou)
 
 gene<- read_excel("CV-Généalogie_des_sitous_test.xlsx", 
                   sheet = "SitousAmontAval")
 gene<-gene %>% 
-  select(-Situation_Sitou,-Situation_Sitou_Am,-`Liaison_Sitou-Amont`) #%>% 
-  #filter(No_Type_Sitou %in% noeuds_indus$identifiant & No_Type_Sitou_Am %in% noeuds_indus$identifiant )
+  select(-Situation_Sitou,-Situation_Sitou_Am,-`Liaison_Sitou-Amont`) 
 
 # On crée la table des noeuds de sitous indus
 # Etape 1 : créer la liste des noeuds dont le type de sitou nous intéresse
@@ -203,17 +213,16 @@ liste_sites_indus<-noeuds_sitous_indus %>%
 noeuds_sitous_indus$Nom_Sitou<-gsub(" ","\n",noeuds_sitous_indus$Nom_Sitou) # Pour passage à la ligne entre chaque mot
 
 
-
-
 # Etape 2 : créer la liste des liens
 liens_sitous_indus<-gene %>% 
   select(No_Sitou_Am,No_Sitou) %>% 
    distinct()
 
 
-## 3.3. LOOP ----
+## 3.2. LOOP SUR LA LISTE DES SITES ----
 
 #for (k in 1:nrow(liste_sites_indus))
+wb <- createWorkbook()
 for (k in 1:10)
 {
   code_site <- liste_sites_indus$identifiant[k]
@@ -285,21 +294,32 @@ for (k in 1:10)
              No_Sitou_Am %in% noeuds_site_def$identifiant)
   
   
-  ## 3.4. Extraction Excel des liaisons ----
-  liens_extract<-gene %>% 
-    filter(No_Sitou %in% lien_site_def$No_Sitou & 
-             No_Sitou_Am %in% lien_site_def$No_Sitou_Am )
-    
+  ## 3.3. Extraction Excel des liaisons ----
+ #  write.xlsx(noeuds_site_def, "liaisons.xlsx", sheetName = nom_site,
+ #            append = TRUE)
+  
+  # Ajouter une feuille
+  if(nchar(nom_site)<=20)
+  {
+  addWorksheet(wb, nom_site)
+  }
+  else
+  {
+   nom_feuille<-str_sub(nom_site,1,20) #récupère les caractères entre le 1er et le 20e
+   addWorksheet(wb, nom_feuille)
+  }  
+  # Écrire les données dans la feuille
+  noeuds_site_export<-noeuds_site_def
+  noeuds_site_export<-left_join(noeuds_site_export,types_sitou, by = "No_Type_Sitou")
+  
+  noeuds_site_export$Nom_Sitou<-gsub("\n"," ",noeuds_site_export$Nom_Sitou)
+  setColWidths(wb, sheet = k, cols = 1:3, width = "auto")
+  writeData(wb, sheet = k, noeuds_site_export, startRow = 1, startCol = 1)
   
   
   
-  write.xlsx(liens_extract, "liaisons.xlsx", sheetName = nom_site,
-             append = TRUE)
   
-  
-  
-  
-  ## 3.5. Paramétrage du graphe  ----
+  ## 3.4. Paramétrage du graphe  ----
   
   graphe_sitous_indus <- create_graph() %>%
     add_nodes_from_table(table = noeuds_site_def, label_col = "Nom_Sitou") %>%
@@ -490,7 +510,7 @@ for (k in 1:10)
   
   render_graph(
     graphe_sitous_indus,
-    layout = "nicely",  #alternatives : nicely,fr
+    layout = "fr",  #alternatives : nicely,fr
     output = "graph",
     title = nom_site
   )
@@ -506,3 +526,203 @@ for (k in 1:10)
   
   
 }
+# Enregistrer le fichier Excel avec le nom désiré
+saveWorkbook(wb, file.path("noeuds_sitous.xlsx"), overwrite = TRUE) # fichier excel pour visualisation
+
+
+## 3.5. Fichier légende ----
+{
+  graphe_légende <- create_graph() %>%
+  add_nodes_from_table(table = noeuds_indus, label_col = "Type_Sitou") %>%
+  set_node_attrs(node_attr = style, value = "filled") %>%
+  #### Mise en forme par type de sitous ----
+##### Type Sitou = site industriel (12) ----
+select_nodes(conditions = identifiant == "12") %>%
+  set_node_attrs_ws(node_attr = color, value = "coral3") %>%
+  set_node_attrs_ws(node_attr = fillcolor, value = "coral3") %>%
+  set_node_attrs_ws(node_attr = shape, value = "circle") %>%
+  set_node_attrs_ws(node_attr = height, value = "0.35") %>%
+  clear_selection()
+
+get_node_df(graphe_légende)
+
+##### Type Sitou = atelier industriel (85) ----
+if (any(noeuds_indus$identifiant == "85"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "85") %>%
+    set_node_attrs_ws(node_attr = color, value = "coral2") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "coral2") %>%
+    set_node_attrs_ws(node_attr = shape, value = "circle") %>%
+    set_node_attrs_ws(node_attr = height, value = "0.15") %>%
+    clear_selection()
+}
+
+
+##### Type Sitou = STEP indus (25) ----
+if (any(noeuds_indus$identifiant == "25"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "25") %>%
+    set_node_attrs_ws(node_attr = color, value = "coral") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "coral") %>%
+    set_node_attrs_ws(node_attr = shape, value = "square") %>%
+    clear_selection()
+}
+
+##### Type Sitou = ouvrage de rejet souterrain (102)----
+if (any(noeuds_indus$identifiant == "102"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "102") %>%
+    set_node_attrs_ws(node_attr = color, value = "steelblue4") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "steelblue4") %>%
+    set_node_attrs_ws(node_attr = shape, value = "triangle") %>%
+    set_node_attrs_ws(node_attr = orientation, value = 180) %>%
+    clear_selection()
+}
+
+##### Type Sitou = ouvrage de rejet superficiel (26)----
+if (any(noeuds_indus$identifiant == "26"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "26") %>%
+    set_node_attrs_ws(node_attr = color, value = "steelblue1") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "steelblue1") %>%
+    set_node_attrs_ws(node_attr = shape, value = "triangle") %>%
+    set_node_attrs_ws(node_attr = orientation, value = 180) %>%
+    clear_selection()
+}
+
+##### Type Sitou = point de prélèvement eau souterraine (18)----
+if (any(noeuds_indus$identifiant == "18"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "18") %>%
+    set_node_attrs_ws(node_attr = color, value = "steelblue4") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "steelblue4") %>%
+    set_node_attrs_ws(node_attr = shape, value = "triangle") %>%
+    clear_selection()
+}
+
+##### Type Sitou = point de prélèvement eau superficielle (17)----
+if (any(noeuds_indus$identifiant == "17"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "17") %>%
+    set_node_attrs_ws(node_attr = color, value = "steelblue1") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "steelblue1") %>%
+    set_node_attrs_ws(node_attr = shape, value = "triangle") %>%
+    clear_selection()
+}
+
+##### Type Sitou = point d'autosurveillance (224)----
+if (any(noeuds_indus$identifiant == "224"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "224") %>%
+    set_node_attrs_ws(node_attr = color, value = "yellowgreen") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "yellowgreen") %>%
+    set_node_attrs_ws(node_attr = shape, value = "polygon") %>%
+    set_node_attrs_ws(node_attr = sides, value = "8") %>%
+    set_node_attrs_ws(node_attr = height, value = "0.2") %>%
+    set_node_attrs_ws(node_attr = width, value = "0.2") %>%
+    clear_selection()
+}
+
+##### Type Sitou = point d'autosurveillance SCL (242)----
+if (any(noeuds_indus$identifiant == "242"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "242") %>%
+    set_node_attrs_ws(node_attr = color, value = "gray77") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "gray77") %>%
+    set_node_attrs_ws(node_attr = shape, value = "polygon") %>%
+    set_node_attrs_ws(node_attr = sides, value = "8") %>%
+    set_node_attrs_ws(node_attr = height, value = "0.2") %>%
+    set_node_attrs_ws(node_attr = width, value = "0.2") %>%
+    clear_selection()
+}
+
+##### Type Sitou = point de comptage (20)----
+if (any(noeuds_indus$identifiant == "20"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "20") %>%
+    set_node_attrs_ws(node_attr = color, value = "goldenrod1") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "goldenrod1") %>%
+    set_node_attrs_ws(node_attr = shape, value = "polygon") %>%
+    set_node_attrs_ws(node_attr = sides, value = "8") %>%
+    set_node_attrs_ws(node_attr = height, value = "0.2") %>%
+    set_node_attrs_ws(node_attr = width, value = "0.2") %>%
+    clear_selection()
+}
+
+##### Type Sitou = STEP collectivité (29) ----
+if (any(noeuds_indus$identifiant == "29"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "29") %>%
+    set_node_attrs_ws(node_attr = color, value = "mediumpurple1") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "mediumpurple1") %>%
+    set_node_attrs_ws(node_attr = shape, value = "square") %>%
+    clear_selection()
+}
+
+
+##### Type Sitou = sous-système de collecte (24) ----
+if (any(noeuds_indus$identifiant == "24"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "24") %>%
+    set_node_attrs_ws(node_attr = color, value = "mediumpurple1") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "mediumpurple1") %>%
+    set_node_attrs_ws(node_attr = shape, value = "circle") %>%
+    clear_selection()
+}
+
+##### Type Sitou = système de collecte (243) ----
+if (any(noeuds_indus$identifiant == "243"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "243") %>%
+    set_node_attrs_ws(node_attr = color, value = "mediumpurple4") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "mediumpurple4") %>%
+    set_node_attrs_ws(node_attr = shape, value = "circle") %>%
+    clear_selection()
+}
+
+##### Type Sitou = périmètre de gestion d'autosurveillance (11) ----
+if (any(noeuds_indus$identifiant == "11"))
+{
+  graphe_légende <- graphe_légende  %>%
+    select_nodes(conditions = identifiant == "11") %>%
+    set_node_attrs_ws(node_attr = color, value = "mintcream") %>%
+    set_node_attrs_ws(node_attr = fillcolor, value = "mintcream") %>%
+    set_node_attrs_ws(node_attr = shape, value = "circle") %>%
+    clear_selection()
+}
+
+#####Couleur et taille du texte général, taille des flèches ----
+
+graphe_légende <- graphe_légende  %>%
+  set_node_attrs(node_attr = fontcolor, value = "black") %>% 
+  set_node_attrs(node_attr = fontsize, value = "6")
+
+render_graph(
+  graphe_légende,
+  layout = "nicely",  #alternatives : nicely,fr
+  output = "graph",
+  title = "Codes de représentation des sitous maillés"
+)
+
+export_graph(
+  graphe_légende,
+  file_name = paste0("diagrammes/Legende.png"),
+  file_type = "PNG",
+  title = "Codes de représentation des sitous maillés",
+  width = 1600,
+  height = 1100
+)
+}
+

@@ -31,8 +31,6 @@ output:
   df_print: kable
 ---
 
-
-
 ```{r}
 #0. PACKAGES ----
 library(tidyverse)
@@ -45,13 +43,32 @@ library(xlsx)
 library(openxlsx)
 library(stringr)
 library(kableExtra)
+library(knitr)
+library(here)
+library(png)
 ```
+
 \vspace{-2.5cm}
+
 ![](quarto_files/diagramme.png)
-![](quarto_files/legende.png)
-```{r}
+
+
+```{r, out.width = "700px"}
 noeuds_Q <- read_excel("quarto_files/noeuds.xlsx")
- noeuds_Q <- noeuds_Q %>%
+#Légende pour les sitous industriels
+if(any(noeuds_Q$No_Type_Sitou=="012"))
+{include_graphics(here::here("quarto_files","legende_indus.png"))
+}
+
+#Légende pour les sitous agricoles
+if(any(noeuds_Q$No_Type_Sitou=="013"))
+{include_graphics(here::here("quarto_files","legende_agri.png"))
+}
+
+```
+
+```{r}
+noeuds_Q <- noeuds_Q %>%
   arrange(Type_Sitou) %>% 
   kable(format = "latex", 
         booktabs = TRUE, 

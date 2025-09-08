@@ -74,8 +74,8 @@ liens_sitous_indus<-gene %>%
 
 ## 3.2. LOOP SUR LA LISTE DES SITES ----
 
-#for (k in 1:nrow(liste_sites_indus))
-for (k in 100:115)
+for (k in 1:nrow(liste_sites_indus))
+#for (k in 100:115)
 
 {
   code_site <- liste_sites_indus$identifiant[k]
