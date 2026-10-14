@@ -52,19 +52,19 @@ n_base$Libellé <- gsub(" ", "\n", n_base$Libellé) # Pour passage à la ligne e
 
 # NETTOYAGE DU GRAPHE ----
 noeuds_a_supprimer<-c(
-                      "108", # Zone redevance prel eaux sup
-                      "109", # Zone redevance prel eaux sout
+                      # "108", # Zone redevance prel eaux sup
+                      # "109", # Zone redevance prel eaux sout
                       "128", # Zone redevance bassin
-                      "129", # Zone redevance pollution
+                      # "129", # Zone redevance pollution
                       "231", # Zone vulnérable
                       "232", # Zone redevabilité élevage
                       "235", # Zonage redevabilité chaleur
                       "238", # Zone SGL sout
                       "239", # Zone SGL sup
-                      
+
                       "229", # Natura 2000 Habitats
                       "230", # Natura 2000 Oiseaux
-                      
+
                       "218", # Contrat avec programme d'action
                       "219", # Contrat anim-assist technique
                       "220", # Contrat institutionnel
@@ -74,31 +74,31 @@ noeuds_a_supprimer<-c(
 
                       "227", # Eaux conchylocoles
                       "228", # Eaux de baignade
-                      
+
                       "217", # Distributeur agréé de phytos
                       "236", # Action groupée d'activité éco
-                      
-                      # Suppressions spécifiques à DVO suite à étude des maillages
-                      # Ne pas forcément conserver sur d'autres DT !
-                      
-                      "040", # Obstacle à l'écoulement (pas présent sur DVO)
-                      "105", # Unité de compétence (ne semble plus utilisé)
-                      "015", # Installation hydroélectrique
+                      # 
+                      # # Suppressions spécifiques à DVO suite à étude des maillages
+                      # # Ne pas forcément conserver sur d'autres DT !
+                      # 
+                      # "040", # Obstacle à l'écoulement (pas présent sur DVO)
+                      # "105", # Unité de compétence (ne semble plus utilisé)
+                      # "015", # Installation hydroélectrique
                       "104", # Plan d'eau
                       "035", # Lieu plan d'eau
-                      "214", # ME Transition
-                      "213", # ME Cotiere
-                      
-                      # Autres types de sitou à retirer dans le cadre de l'étude des pressions qualitatives
-                      "134", # Délégataire
+                      # "214", # ME Transition
+                      # "213", # ME Cotiere
+                      # 
+                      # # Autres types de sitou à retirer dans le cadre de l'étude des pressions qualitatives
+                      # "134", # Délégataire
                       "013", # Exploitation agricole
                       "086", # Atelier agricole
-                      "027", # Centre de traitement déchets
-                      "011", # Périmètre gestion autosurveillance
-                      "096", # Site non économique
-                      
-                      # Sitous à réactiver dans le cas d'une étude en lien avec le prélèvement
-                      "140", # Bief de canal (utilisé uniquement pour la redevance canaux)
+                      # "027", # Centre de traitement déchets
+                      # "011", # Périmètre gestion autosurveillance
+                      # "096", # Site non économique
+                      # 
+                      # # Sitous à réactiver dans le cas d'une étude en lien avec le prélèvement
+                      # "140", # Bief de canal (utilisé uniquement pour la redevance canaux)
                       "233", # AAC,
                       "139", # Qualitomètre
                       "010", # Dispo collect milieu nat
@@ -106,69 +106,69 @@ noeuds_a_supprimer<-c(
                       "138", # Lieu prel littoral
                       "032", # Station ESU
                       "033", # Lieu qualité rivière
-                      "020", # Point de comptage
+                      # "020", # Point de comptage
                       "215", # ME Souterraine affleurante
-                      "017", # Pt prel eaux sup
-                      "018", # Pt d'eau
-                      "226", # UH
-                      
+                      # "017", # Pt prel eaux sup
+                      # "018", # Pt d'eau
+                      # "226", # UH
+                      # 
                       
                       
                       "")
 
 liaisons_a_supprimer<-c(
-                      # Liaisons non autorisées
-                      "018-226", # Point d'eau --> UH
-                      "017-226", # Point de prél eaux sup --> UH
-                      "012-029", # Site indus --> STEP
-                      "024-026", # SSCL --> Ouvrage rejet
-                      
-                      # Liaison retirées pour alléger
-                      "006-137", # EPCI --> Commune
-                      "137-024", # Commune --> SSCL 
-                      
-                      
-                      #Liaisons inexistantes à DVO
-                      "029-024", # STEU Collectivité --> SSCL
-                      "024-025", # SSCL --> STEU indus
-                      
-                      # Liaisons à conserver
-                      "026-211",
-                      "026-212",
-                      "242-026",
-                      "029-026",
-                      "025-026",
-                      "085-026",
-                      
-                      "137-029",
-                      "006-029",
-                      "024-029",
-                      
-                      "243-024",
-                      "024-024",
-                      "025-024",
-                      "085-024",
-                      
-                      "025-014",
-                      "085-014",
-                      
-                      "085-224",
-                      "025-224",
-                      "026-224",
-                      "029-224",
-                      
-                      "012-085",
-                      "012-025",
-                      "025-025",
-                      "085-025",
-                      
-                      "024-242",
-                      
-                      #INFILTRATION
-                      "102-216",
-                      "029-102",
-                      "025-102",
-                      "085-102"
+                      # # Liaisons non autorisées
+                      # "018-226", # Point d'eau --> UH
+                      # "017-226", # Point de prél eaux sup --> UH
+                      # "012-029", # Site indus --> STEP
+                      # "024-026", # SSCL --> Ouvrage rejet
+                      # 
+                      # # Liaison retirées pour alléger
+                      # "006-137", # EPCI --> Commune
+                      # "137-024", # Commune --> SSCL 
+                      # 
+                      # 
+                      # #Liaisons inexistantes à DVO
+                      # "029-024", # STEU Collectivité --> SSCL
+                      # "024-025", # SSCL --> STEU indus
+                      # 
+                      # # Liaisons à conserver
+                      # "026-211",
+                      # "026-212",
+                      # "242-026",
+                      # "029-026",
+                      # "025-026",
+                      # "085-026",
+                      # 
+                      # "137-029",
+                      # "006-029",
+                      # "024-029",
+                      # 
+                      # "243-024",
+                      # "024-024",
+                      # "025-024",
+                      # "085-024",
+                      # 
+                      # "025-014",
+                      # "085-014",
+                      # 
+                      # "085-224",
+                      # "025-224",
+                      # "026-224",
+                      # "029-224",
+                      # 
+                      # "012-085",
+                      # "012-025",
+                      # "025-025",
+                      # "085-025",
+                      # 
+                      # "024-242",
+                      # 
+                      # #INFILTRATION
+                      # "102-216",
+                      # "029-102",
+                      # "025-102",
+                      # "085-102"
                         )
 
 

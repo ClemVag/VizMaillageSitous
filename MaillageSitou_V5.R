@@ -41,16 +41,13 @@
 # Visualisation : permet de sortir les fichiers PDF de visualisation des sitous
 # DT  : pour le rangement
 
-Représentation = "05" # Attention, mettre les chiffres entre guillemets !
+Représentation = "01" # Attention, mettre les chiffres entre guillemets !
 
 visualisation = "O"
 
 DT_maillage = "DVO"
 
 #Changer le nom aussi sur le fichier de données le cas échéant.
-
-
-
 
 # - 012 pour les sites industriels
 # - 013 pour les sites agricoles
@@ -147,7 +144,7 @@ DT_maillage = "DVO"
     list(type = "026", color = "steelblue1", shape ="triangle", extras = list(orientation = 180)),
     
     # Type Sitou = point de prélèvement eau souterraine (018)
-    list(type = "102", color = "steelblue4", shape ="triangle", extras = list()),
+    list(type = "018", color = "steelblue4", shape ="triangle", extras = list()),
     
     # Type Sitou = point de prélèvement eau superficielle (017)
     list(type = "017", color = "steelblue1", shape = "triangle",  extras = list()),
@@ -156,7 +153,7 @@ DT_maillage = "DVO"
     list(type = "224", color = "yellowgreen", shape = "polygon",   extras = list(sides = "8", height = "0.2", width = "0.2")),
     
     # Type Sitou = point d'autosurveillance SCL (242)
-    list(type = "224", color = "gray77", shape ="polygon", extras = list(sides = "8", height = "0.2", width = "0.2")),
+    list(type = "242", color = "gray77", shape ="polygon", extras = list(sides = "8", height = "0.2", width = "0.2")),
     
     # Type Sitou = point de comptage (020)
     list(type = "020", color = "goldenrod1", shape ="polygon", extras = list(sides = "8", height = "0.2", width = "0.2")),
@@ -196,8 +193,12 @@ type_site = case_when(Représentation == "01" ~ "012",
 
 # Pour constituer la liste des sites à étudier, on récupère tous les sites de la DT
 # correspondant au type de site attendu. 
+# Le périmètre est réduit sur une DT pour les sitous de type industriel, agricole, 
+# etc et est élargi aux ressources bassin pour les cours d'eau. 
+perimetre <- ifelse(type_site == "211", c(DT_maillage, "Autres"), DT_maillage)
+
 liste_sites <- n_base |>  
-  filter(No_Type_Sitou == type_site & DT %in% c(DT_maillage, "Autres"))  |>  
+  filter(No_Type_Sitou == type_site & DT %in% perimetre)  |>  
   distinct() |> 
   select(identifiant, Nom_Sitou)
 # filter(identifiant %in% c("HR202A_211"))
@@ -399,7 +400,7 @@ if(type_site=="211")
 
 # 3. LOOP SUR LA LISTE DES SITES ----
 
-for (k in 1:10)
+for (k in 1:nrow(liste_sites))
   #for (k in 1:50)
   #k=60
   
@@ -409,7 +410,7 @@ for (k in 1:10)
   # Informations relatives au site et à son futur chemin d'export
   code_site <- liste_sites$identifiant[k]
   nom_site <- liste_sites$Nom_Sitou[k]
-  UH<-"test2"
+  # UH<-"test2"
   # UH <- ifelse(length(export_chemin$UH[which(export_chemin$`No interne Sitou` ==
   #                                              code_site)]) == 0,
   #              "Pas d'UH",
@@ -566,36 +567,217 @@ for (k in 1:10)
   ## 3.4. PREPARATION DU FICHIER DES SITOUS LIES----
   col_nom_site = rep.int(nom_site,nrow(n_site_def))
   col_code_site = rep.int(code_site,nrow(n_site_def))
-  col_UH = rep.int(UH,nrow(n_site_def))
+  col_UH = rep.int("UH",nrow(n_site_def))
   liste_sitous_lies_temp <- cbind(col_UH,col_code_site,col_nom_site,n_site_def)
   colnames(liste_sitous_lies_temp) = colnames(liste_sitous_lies)
   liste_sitous_lies <- distinct(rbind(liste_sitous_lies,liste_sitous_lies_temp))
   
   # 4. VISUALISATION GRAPHE COMPLET ----
-  if (visualisation == "O")
-    #On reprend ce qui a été défini au moment du paramétrage
+  if (visualisation == "O" & nrow(n_site_def)>2)
+    # On reprend ce qui a été défini au moment du paramétrage pour la visualisation.
+    # On ne représente que les sitous qui ont au moins 2 liaisons
+    # Ceux qui en ont moins seront quand même pris en compte dans le tableau
+    # récap, mais le graphe n'est vraiment pas intéressant !
+    # Idem, s'il y a plus de 50 liaisons, il y a vraisemblablement un problème !
+    
   {
-    if(nrow(n_site_def)>2) 
-      #On ne représente que les sitous qui ont au moins 2 liaisons
-      #Ceux qui en ont moins seront quand même pris en compte dans le tableau
-      #récap, mais le graphe n'est vraiment pas intéressant !
-      # Idem, s'il y a plus de 50 liaisons, il y a vraisemblablement un problème !
-      
+    ## 4.1. EXPORT VERS EXCEL POUR QUARTO  ----
+    n_site_export <- n_site_def
+    n_site_export <- left_join(n_site_export, types_sitou, by = "No_Type_Sitou")
+    write.xlsx(n_site_export, "quarto_files/noeuds.xlsx")
+    
+    ## 4.2. GRAPHE COMPLET ET PARAMETRAGE  ----
+    # On remplace les espaces par le caractère \n pour passer à la ligne dans le rendu graphique
+    n_site_def$Nom_Sitou <- gsub(" ", "\n", n_site_def$Nom_Sitou) 
+    
+    # Initialisation du graphique
+    graphe_sitous <- create_graph() |> 
+      add_nodes_from_table(table = n_site_def, label_col = "Nom_Sitou") |> 
+      add_edges_from_table(
+        table = l_site_def,
+        from_col = "No_Sitou_Am",
+        to_col = "No_Sitou",
+        from_to_map = "identifiant"
+      ) |> 
+      set_node_attrs(node_attr = style, value = "filled")
+    
+    # Application des styles de la liste définie au 2.1.5
+    
+    for (s in styles) {
+      if (any(n_site_def$No_Type_Sitou == s$type)) {
+        graphe_sitous <- graphe_sitous |>
+          select_nodes(conditions = No_Type_Sitou == s$type) |>
+          set_node_attrs_ws(node_attr = color,     value = s$color) |>
+          set_node_attrs_ws(node_attr = fillcolor, value = s$color) |>
+          set_node_attrs_ws(node_attr = shape,     value = s$shape)
+        
+        for (attr in names(s$extras)) {
+          graphe_sitous <- set_node_attrs_ws(graphe_sitous, node_attr = !!sym(attr), value = s$extras[[attr]])
+          
+          # Explication de cette syntaxe : 
+          # for (attr in names(s$extras))	    Boucle sur les noms des attributs
+          # s$extras[[attr]]	                Récupère la valeur associée
+          # sym(attr)	                        Convertit le nom (texte) en symbole R
+          # !!	                              Injecte le symbole comme argument de la fonction - "évalue ce symbole maintenant et injecte-le tel quel"
+        }
+        
+        graphe_sitous <- graphe_sitous |> clear_selection()
+      }
+    }
+    
+    # Application de la couleurs de police et de flèches
+    graphe_sitous <- graphe_sitous  |> 
+      set_node_attrs(node_attr = fontcolor, value = "black") |> 
+      set_node_attrs(node_attr = fontsize, value = "7") |> 
+      set_edge_attrs(edge_attr = color, value = "gray33") |> 
+      set_edge_attrs(edge_attr = penwidth, value = "0.5")
+    
+    # Rendu du graphique 
+    render_graph(
+      graphe_sitous,
+      layout = "fr",  #alternatives : nicely,fr
+      output = "graph",
+      title = nom_site
+    )
+    
+    export_graph(
+      graphe_sitous,
+      file_name = "quarto_files/diagramme.png",
+      file_type = "PNG",
+      # title = nom_site,
+      width = 1100,
+      height = 800
+    )
+    
+    ## 4.3. GRAPHE SIMPLIFIE ----
+    # Ce graphe ne s'applique que pour la vision cours d'eau. 
+    if(Représentation == "05")
     {
-      ## 4.1. EXPORT VERS EXCEL POUR QUARTO  ----
-      n_site_export <- n_site_def
-      n_site_export <- left_join(n_site_export, types_sitou, by = "No_Type_Sitou")
-      write.xlsx(n_site_export, "quarto_files/noeuds.xlsx")
+      ### 4.3.1. TABLE DE DONNEES SIMPLIFIEE ----
       
-      ## 4.2. GRAPHE COMPLET ET PARAMETRAGE  ----
-      # On remplace les espaces par le caractère \n pour passer à la ligne dans le rendu graphique
-      n_site_def$Nom_Sitou <- gsub(" ", "\n", n_site_def$Nom_Sitou) 
+      # Dans le graphe simplifié, on veut pouvoir afficher uniquement l'origine
+      # et la destination du rejet.
+      # On va donc chercher à éliminer tous les types d'objets intermédiaires, 
+      # à l'exception du point d'autosurveillance SSCL (224), à qui on peut rattacher
+      # les informations d'autosurveillance.
+      # Les objets "origine" sont :
+      # - STEU collectivité locale (029)
+      # - Système de collecte (243)
+      # - Site industriel (012)
+      
+      # On commence par prendre la liste de toutes les liaisons du site.
+      # Ce sera notre liste de référence pour la suite. 
+      l_site_reference<-l_site_def |>
+        select(No_Sitou_Am, No_Sitou)
+      
+      
+      # On crée une "keep list" (liste à conserver) des liaisons existantes pour :
+      # - les rejets reliés directement à une station, un SCL ou une entreprise en amont
+      # - les rejets reliés à une masse d'eau ou à un bassin versant en aval
+      # Cette liste sera incrémentée par la suite par les éléments à conserver sur le 
+      # graphique simplifié. 
+      
+      keep_list <- l_site_def |> 
+        filter((type_Av=="026" & type_Am %in% c("029","243","012")) | (type_Am=="026" & type_Av %in% c("211","212")))  |> 
+        select(No_Sitou_Am,No_Sitou)
+      
+      # On crée une liste pour amorcer l'algorithme avec des sitous aval de type
+      # point de rejet et des sitous amont qui ne soient pas des sitous "origine"
+      # (STEU, système de collecte ou site industriel)
+      l_int_simpl_01 <- l_site_def |>  
+        filter(type_Av=="026" & type_Am %nin% c("029","243","012")) |> 
+        select(No_Sitou_Am, No_Sitou)
+      
+      # On fait une première jointure entre la liste de toutes les liaisons du site et
+      # la liste précédemment définie des liaisons entre points de rejet et sitous amont.
+      # Cela permet de récupérer un niveau de liaison amont supplémentaire.
+      # Le renommage de la colonne Rejet permettra de se simplifier l'extraction des données
+      # qui nous intéressent par la suite. 
+      l_int_simpl_02 <- l_site_reference |> 
+        left_join(l_int_simpl_01,by=c("No_Sitou"="No_Sitou_Am")) |> 
+        rename("Rejet"="No_Sitou.y") |> 
+        filter(!is.na(Rejet))
+      
+      # On crée une table intermérdiaire l_int_simpl_03 qui servira à l'algorithme.
+      # Son nombre de lignes sera utilisé pour savoir quand arrêter la boucle while.
+      l_int_simpl_03<-l_int_simpl_02
+      
+      while(nrow(l_int_simpl_03)>0)
+      {
+        
+        # Cas des systèmes de collecte 
+        # Ce cas est particulier car on souhaite garder la liaison avec le point 
+        # d'autosurveillance SCL 
+        if(any(str_sub(l_int_simpl_03$No_Sitou_Am,-3) == "243"))
+        {
+          # On crée un tableau intermédiaire pour conserver les rejets reliés à un système de collecte.
+          l_int_simpl_04 <- l_int_simpl_03 |> 
+            filter(str_sub(No_Sitou_Am,-3) == "243")
+          
+          # On a sur le dataframe l_int_simpl_05 la liste desliaisons entre les SCL et les points AS SCL
+          l_int_simpl_05<-l_int_simpl_04[c(1,ncol(l_int_simpl_04)-1)]
+          colnames(l_int_simpl_05)=colnames(keep_list)
+          
+          # Et sur le dataframe l_int_simpl_06 la liste desliaisons entre les points AS SCL et les points de rejets
+          l_int_simpl_06<-l_int_simpl_04[c(ncol(l_int_simpl_04)-1,ncol(l_int_simpl_04))]
+          colnames(l_int_simpl_06)=colnames(keep_list)
+          
+          # On ajoute ces deux tableaux à la liste de liaisons à conserver 
+          keep_list<-bind_rows(keep_list,l_int_simpl_05,l_int_simpl_06)
+          
+          # Et enfin, on retire ces lignes du tableau l_int_simpl_03 afin de ne plus les traiter.
+          l_int_simpl_03<-l_int_simpl_03 |> 
+            filter(No_Sitou_Am %nin% l_int_simpl_04$No_Sitou_Am)
+        }
+        
+        # Cas des sites industriels
+        # On va aller chercher tous les ascendants en ligne directe des points de rejet
+        # tout en supprimant ceux qui transitent par un système de collecte (déjà pris
+        # en compte avec les STEU).
+        if(any(str_sub(l_int_simpl_03$No_Sitou_Am,-3) %in% c("012")))
+        {
+          l_int_simpl_07 <- l_int_simpl_03 |> 
+            filter(str_sub(No_Sitou_Am,-3) == "012") |> 
+            filter(if_all(everything(), ~ str_sub(.x, -3) != "024")) # Retire toutes les branches dont les rejets passent par des SCL
+          
+          # K2<- l_int_simpl_03 |> 
+          #   filter(str_sub(No_Sitou_Am,-3) == "012") |> 
+          #   filter(if_all(everything(), ~ str_sub(.x, -3) == "024"))
+          
+          l_int_simpl_08<- l_int_simpl_07[c(1,ncol(l_int_simpl_07))]
+          colnames(l_int_simpl_08) = colnames(keep_list)
+          
+          keep_list<-bind_rows(keep_list,l_int_simpl_08)
+          
+          l_int_simpl_03<-l_int_simpl_03 |> 
+            filter(No_Sitou_Am %nin% l_int_simpl_07$No_Sitou_Am)
+        }
+        
+        l_int_simpl_03<-left_join(l_site_reference,l_int_simpl_03,by=c("No_Sitou"="No_Sitou_Am"), relationship = "many-to-many") |> 
+          filter(!is.na(Rejet))
+        
+      }
+      
+      keep_list<-distinct(keep_list)
+      
+      # On "empile" les deux colonne de la liste de liaisons à conserver (keep_list)
+      # pour obtenir une liste de noeuds à conserver. 
+      noeuds_keep_list<-c(keep_list$No_Sitou_Am,keep_list$No_Sitou) |> 
+        unique()
+      
+      # On récupère tous les sites qui ont au moins une liaison dans la Keep List
+      # pour en faire la base du graphique simplifié. 
+      n_site_simpl<-n_site_def |> 
+        filter(identifiant %in% noeuds_keep_list)
+      
+      
+      ### 4.3.2. RENDU GRAPHIQUE ----
       
       # Initialisation du graphique
-      graphe_sitous <- create_graph() |> 
-        add_nodes_from_table(table = n_site_def, label_col = "Nom_Sitou") |> 
+      graphe_simpl <- create_graph() |> 
+        add_nodes_from_table(table = n_site_simpl, label_col = "Nom_Sitou") |> 
         add_edges_from_table(
-          table = l_site_def,
+          table = keep_list,
           from_col = "No_Sitou_Am",
           to_col = "No_Sitou",
           from_to_map = "identifiant"
@@ -605,29 +787,23 @@ for (k in 1:10)
       # Application des styles de la liste définie au 2.1.5
       
       for (s in styles) {
-        if (any(n_site_def$No_Type_Sitou == s$type)) {
-          graphe_sitous <- graphe_sitous |>
+        if (any(n_site_simpl$No_Type_Sitou == s$type)) {
+          graphe_simpl <- graphe_simpl |>
             select_nodes(conditions = No_Type_Sitou == s$type) |>
             set_node_attrs_ws(node_attr = color,     value = s$color) |>
             set_node_attrs_ws(node_attr = fillcolor, value = s$color) |>
             set_node_attrs_ws(node_attr = shape,     value = s$shape)
           
           for (attr in names(s$extras)) {
-            graphe_sitous <- set_node_attrs_ws(graphe_sitous, node_attr = !!sym(attr), value = s$extras[[attr]])
-            
-            # Explication de cette syntaxe : 
-            # for (attr in names(s$extras))	    Boucle sur les noms des attributs
-            # s$extras[[attr]]	                Récupère la valeur associée
-            # sym(attr)	                        Convertit le nom (texte) en symbole R
-            # !!	                              Injecte le symbole comme argument de la fonction - "évalue ce symbole maintenant et injecte-le tel quel"
+            graphe_simpl <- set_node_attrs_ws(graphe_simpl, node_attr = !!sym(attr), value = s$extras[[attr]])
           }
           
-          graphe_sitous <- graphe_sitous |> clear_selection()
+          graphe_simpl <- graphe_simpl |> clear_selection()
         }
       }
       
       # Application de la couleurs de police et de flèches
-      graphe_sitous <- graphe_sitous  |> 
+      graphe_simpl <- graphe_simpl  |> 
         set_node_attrs(node_attr = fontcolor, value = "black") |> 
         set_node_attrs(node_attr = fontsize, value = "7") |> 
         set_edge_attrs(edge_attr = color, value = "gray33") |> 
@@ -635,211 +811,34 @@ for (k in 1:10)
       
       # Rendu du graphique 
       render_graph(
-        graphe_sitous,
+        graphe_simpl,
         layout = "fr",  #alternatives : nicely,fr
         output = "graph",
         title = nom_site
       )
       
+      # Export du graphique pour intégration dans Quarto
       export_graph(
-        graphe_sitous,
-        file_name = "quarto_files/diagramme.png",
+        graphe_simpl,
+        file_name = "quarto_files/diagramme_simpl.png",
         file_type = "PNG",
         # title = nom_site,
         width = 1100,
         height = 800
       )
       
-      ## 4.3. GRAPHE SIMPLIFIE ----
-      # Ce graphe ne s'applique que pour la vision cours d'eau. 
-      if(Représentation == "05")
-      {
-        ### 4.3.1. TABLE DE DONNEES SIMPLIFIEE ----
-        
-        # Dans le graphe simplifié, on veut pouvoir afficher uniquement l'origine
-        # et la destination du rejet.
-        # On va donc chercher à éliminer tous les types d'objets intermédiaires, 
-        # à l'exception du point d'autosurveillance SSCL (224), à qui on peut rattacher
-        # les informations d'autosurveillance.
-        # Les objets "origine" sont :
-        # - STEU collectivité locale (029)
-        # - Système de collecte (243)
-        # - Site industriel (012)
-        
-        # On commence par prendre la liste de toutes les liaisons du site.
-        # Ce sera notre liste de référence pour la suite. 
-        l_site_reference<-l_site_def |>
-          select(No_Sitou_Am, No_Sitou)
-        
-        
-        # On crée une "keep list" (liste à conserver) des liaisons existantes pour :
-        # - les rejets reliés directement à une station, un SCL ou une entreprise en amont
-        # - les rejets reliés à une masse d'eau ou à un bassin versant en aval
-        # Cette liste sera incrémentée par la suite par les éléments à conserver sur le 
-        # graphique simplifié. 
-        
-        keep_list <- l_site_def |> 
-          filter((type_Av=="026" & type_Am %in% c("029","243","012")) | (type_Am=="026" & type_Av %in% c("211","212")))  |> 
-          select(No_Sitou_Am,No_Sitou)
-        
-        # On crée une liste pour amorcer l'algorithme avec des sitous aval de type
-        # point de rejet et des sitous amont qui ne soient pas des sitous "origine"
-        # (STEU, système de collecte ou site industriel)
-        l_int_simpl_01 <- l_site_def |>  
-          filter(type_Av=="026" & type_Am %nin% c("029","243","012")) |> 
-          select(No_Sitou_Am, No_Sitou)
-        
-        # On fait une première jointure entre la liste de toutes les liaisons du site et
-        # la liste précédemment définie des liaisons entre points de rejet et sitous amont.
-        # Cela permet de récupérer un niveau de liaison amont supplémentaire.
-        # Le renommage de la colonne Rejet permettra de se simplifier l'extraction des données
-        # qui nous intéressent par la suite. 
-        l_int_simpl_02 <- l_site_reference |> 
-          left_join(l_int_simpl_01,by=c("No_Sitou"="No_Sitou_Am")) |> 
-          rename("Rejet"="No_Sitou.y") |> 
-          filter(!is.na(Rejet))
-        
-        # On crée une table intermérdiaire l_int_simpl_03 qui servira à l'algorithme.
-        # Son nombre de lignes sera utilisé pour savoir quand arrêter la boucle while.
-        l_int_simpl_03<-l_int_simpl_02
-        
-        while(nrow(l_int_simpl_03)>0)
-        {
-          
-          # Cas des systèmes de collecte 
-          # Ce cas est particulier car on souhaite garder la liaison avec le point 
-          # d'autosurveillance SCL 
-          if(any(str_sub(l_int_simpl_03$No_Sitou_Am,-3) == "243"))
-          {
-            # On crée un tableau intermédiaire pour conserver les rejets reliés à un système de collecte.
-            l_int_simpl_04 <- l_int_simpl_03 |> 
-              filter(str_sub(No_Sitou_Am,-3) == "243")
-            
-            # On a sur le dataframe l_int_simpl_05 la liste desliaisons entre les SCL et les points AS SCL
-            l_int_simpl_05<-l_int_simpl_04[c(1,ncol(l_int_simpl_04)-1)]
-            colnames(l_int_simpl_05)=colnames(keep_list)
-            
-            # Et sur le dataframe l_int_simpl_06 la liste desliaisons entre les points AS SCL et les points de rejets
-            l_int_simpl_06<-l_int_simpl_04[c(ncol(l_int_simpl_04)-1,ncol(l_int_simpl_04))]
-            colnames(l_int_simpl_06)=colnames(keep_list)
-            
-            # On ajoute ces deux tableaux à la liste de liaisons à conserver 
-            keep_list<-bind_rows(keep_list,l_int_simpl_05,l_int_simpl_06)
-            
-            # Et enfin, on retire ces lignes du tableau l_int_simpl_03 afin de ne plus les traiter.
-            l_int_simpl_03<-l_int_simpl_03 |> 
-              filter(No_Sitou_Am %nin% l_int_simpl_04$No_Sitou_Am)
-          }
-          
-          # Cas des sites industriels
-          # On va aller chercher tous les ascendants en ligne directe des points de rejet
-          # tout en supprimant ceux qui transitent par un système de collecte (déjà pris
-          # en compte avec les STEU).
-          if(any(str_sub(l_int_simpl_03$No_Sitou_Am,-3) %in% c("012")))
-          {
-            l_int_simpl_07 <- l_int_simpl_03 |> 
-              filter(str_sub(No_Sitou_Am,-3) == "012") |> 
-              filter(if_all(everything(), ~ str_sub(.x, -3) != "024")) # Retire toutes les branches dont les rejets passent par des SCL
-            
-            # K2<- l_int_simpl_03 |> 
-            #   filter(str_sub(No_Sitou_Am,-3) == "012") |> 
-            #   filter(if_all(everything(), ~ str_sub(.x, -3) == "024"))
-            
-            l_int_simpl_08<- l_int_simpl_07[c(1,ncol(l_int_simpl_07))]
-            colnames(l_int_simpl_08) = colnames(keep_list)
-            
-            keep_list<-bind_rows(keep_list,l_int_simpl_08)
-            
-            l_int_simpl_03<-l_int_simpl_03 |> 
-              filter(No_Sitou_Am %nin% l_int_simpl_07$No_Sitou_Am)
-          }
-          
-          l_int_simpl_03<-left_join(l_site_reference,l_int_simpl_03,by=c("No_Sitou"="No_Sitou_Am"), relationship = "many-to-many") |> 
-            filter(!is.na(Rejet))
-          
-        }
-        
-        keep_list<-distinct(keep_list)
-        
-        # On "empile" les deux colonne de la liste de liaisons à conserver (keep_list)
-        # pour obtenir une liste de noeuds à conserver. 
-        noeuds_keep_list<-c(keep_list$No_Sitou_Am,keep_list$No_Sitou) |> 
-          unique()
-        
-        # On récupère tous les sites qui ont au moins une liaison dans la Keep List
-        # pour en faire la base du graphique simplifié. 
-        n_site_simpl<-n_site_def |> 
-          filter(identifiant %in% noeuds_keep_list)
-        
-        
-        ### 4.3.2. RENDU GRAPHIQUE ----
-        
-        # Initialisation du graphique
-        graphe_simpl <- create_graph() |> 
-          add_nodes_from_table(table = n_site_simpl, label_col = "Nom_Sitou") |> 
-          add_edges_from_table(
-            table = keep_list,
-            from_col = "No_Sitou_Am",
-            to_col = "No_Sitou",
-            from_to_map = "identifiant"
-          ) |> 
-          set_node_attrs(node_attr = style, value = "filled")
-        
-        # Application des styles de la liste définie au 2.1.5
-        
-        for (s in styles) {
-          if (any(n_site_simpl$No_Type_Sitou == s$type)) {
-            graphe_simpl <- graphe_simpl |>
-              select_nodes(conditions = No_Type_Sitou == s$type) |>
-              set_node_attrs_ws(node_attr = color,     value = s$color) |>
-              set_node_attrs_ws(node_attr = fillcolor, value = s$color) |>
-              set_node_attrs_ws(node_attr = shape,     value = s$shape)
-            
-            for (attr in names(s$extras)) {
-              graphe_simpl <- set_node_attrs_ws(graphe_simpl, node_attr = !!sym(attr), value = s$extras[[attr]])
-            }
-            
-            graphe_simpl <- graphe_simpl |> clear_selection()
-          }
-        }
-        
-        # Application de la couleurs de police et de flèches
-        graphe_simpl <- graphe_simpl  |> 
-          set_node_attrs(node_attr = fontcolor, value = "black") |> 
-          set_node_attrs(node_attr = fontsize, value = "7") |> 
-          set_edge_attrs(edge_attr = color, value = "gray33") |> 
-          set_edge_attrs(edge_attr = penwidth, value = "0.5")
-        
-        # Rendu du graphique 
-        render_graph(
-          graphe_simpl,
-          layout = "fr",  #alternatives : nicely,fr
-          output = "graph",
-          title = nom_site
-        )
-        
-        # Export du graphique pour intégration dans Quarto
-        export_graph(
-          graphe_simpl,
-          file_name = "quarto_files/diagramme_simpl.png",
-          file_type = "PNG",
-          # title = nom_site,
-          width = 1100,
-          height = 800
-        )
-        
-        
-      }
       
     }
+    
+    
     ## 4.4. EXPORT DANS LE DOSSIER DE L'UH ----
     
-    chemin_UH<-file.path(chemin,UH)
-    
-    
-    if (!dir.exists(chemin_UH)) {
-      dir.create(chemin_UH, recursive = TRUE)
-    }
+    # chemin_UH<-file.path(chemin,UH)
+    # 
+    # 
+    # if (!dir.exists(chemin_UH)) {
+    #   dir.create(chemin_UH, recursive = TRUE)
+    # }
     
     ifelse(nchar(nom_site)>20,substring(nom_site,1,20),nom_site)
     names_file<-paste0(nom_site,".pdf")
@@ -848,9 +847,10 @@ for (k in 1:10)
     quarto_render(here("Maillage_Quarto.qmd"),output_format = "pdf", 
                   output_file = names_file)
     
-    file.rename(names_file, file.path(chemin_UH, names_file))  
-    
-  } 
+    file.rename(names_file, file.path(chemin, names_file))  
+    # Pour mettre le document dans le dossier de l'UH, remplacer chemin par chemin_UH
+    # Attention à bien réactiver le code pour le définir au préalable !
+  }
   
   # 5. TABLES RECAPITULATIVES ----
   ## 5.1. COMPTAGE DU NOMBRE DE LIAISONS ----

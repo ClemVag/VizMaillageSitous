@@ -48,36 +48,52 @@ library(here)
 library(png)
 ```
 
-\vspace{-2.5cm}
+```{r}
+noeuds_Q <- read_excel("quarto_files/noeuds.xlsx")
+# site <-noeuds_Q %>%
+#   filter(rang==0) %>%
+#   select(Nom_Sitou)
+nom_site<-noeuds_Q$Nom_Sitou[1]
+
+```
+
+\vspace{-3.3cm}
+
+\begin{center}
+\LARGE
+
+`r nom_site`
+
+\end{center}
 
 ![](quarto_files/diagramme.png)
 
-
-```{r, out.width = "700px"}
-noeuds_Q <- read_excel("quarto_files/noeuds.xlsx")
+```{r, out.width = "660px"}
 #Légende pour les sitous industriels
-if(any(noeuds_Q$No_Type_Sitou=="012"))
+if(noeuds_Q$No_Type_Sitou[1]=="012")
 {include_graphics(here::here("quarto_files","legende_indus.png"))
 }
-
 #Légende pour les sitous agricoles
-if(any(noeuds_Q$No_Type_Sitou=="013"))
+if(noeuds_Q$No_Type_Sitou[1]=="013")
 {include_graphics(here::here("quarto_files","legende_agri.png"))
 }
-
+if(noeuds_Q$No_Type_Sitou[1]=="029")
+{include_graphics(here::here("quarto_files","legende_indus.png"))
+}
 ```
 
 ```{r}
 noeuds_Q <- noeuds_Q %>%
-  arrange(Type_Sitou) %>% 
-  kable(format = "latex", 
-        booktabs = TRUE, 
-        longtable = TRUE) %>% 
-  kable_styling(latex_options = c("repeat_header","striped"), font_size = 8) %>% 
+  select(-No_Type_Sitou) %>%
+  distinct() %>%
+  arrange(Type_Sitou) %>%
+  kable(format = "latex",
+        booktabs = TRUE,
+        longtable = TRUE) %>%
+  kable_styling(latex_options = c("repeat_header","striped"), font_size = 8) %>%
    column_spec(1, width = "3.5cm") %>%
-   column_spec(2, width = "8cm") %>%
-   column_spec(3, width = "1.5cm") %>%
-   column_spec(4, width = "4cm")
+   column_spec(2, width = "9cm") %>%
+   column_spec(3, width = "4.5cm")
 
 noeuds_Q
 ```
